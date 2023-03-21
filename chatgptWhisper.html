@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whisper ASR API Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: auto;
+        }
+        button {
+            background-color: #0077cc;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            cursor: pointer;
+        }
+        #transcription {
+            margin-top: 16px;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <h1>Whisper ASR API Example</h1>
+    <button id="start-recording">Start Recording</button>
+    <button id="stop-recording" disabled>Stop Recording</button>
+    <div id="transcription"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        const startRecordingButton = document.getElementById("start-recording");
+        const stopRecordingButton = document.getElementById("stop-recording");
+        const transcriptionDiv = document.getElementById("transcription");
+
+        let mediaRecorder;
+        let audioChunks = [];
+
+        startRecordingButton.addEventListener("click", async () => {
+            startRecordingButton.disabled = true;
+            stopRecordingButton.disabled = false;
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.start();
+
+                mediaRecorder.addEventListener("dataavailable", (event) => {
+                    audioChunks.push(event.data);
+                });
+
+                mediaRecorder.addEventListener("stop", async () => {
+                    const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+                    audioChunks = [];
+                    await sendAudioToWhisper(audioBlob);
+                });
+            } catch (error) {
+                console.error("Error:", error);
+                startRecordingButton.disabled = false;
+            }
+        });
+
+        stopRecordingButton.addEventListener("click", () => {
+            startRecordingButton.disabled = false;
+            stopRecordingButton.disabled = true;
+
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+            }
+        });
+
+        async function sendAudioToWhisper(audioBlob) {
+            // You need to implement the back-end server part to handle the request securely
+            const response = await fetch("http://localhost:3000/api/whisper", {
+                method: "POST",
+                body: audioBlob,
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                transcriptionDiv.textContent = data.transcription;
+            } else {
+                transcriptionDiv.textContent = "Error: Unable to fetch response from Whisper API.";
+            }
+        }
+    </script>
+</body>
+</html>
